@@ -54,42 +54,12 @@ typedef enum {
 	PMIXP_COLL_TYPE_DISCONNECT
 } pmixp_coll_type_t;
 
-inline static char *
-pmixp_coll_type2str(pmixp_coll_type_t type) {
-	switch(type) {
-	case PMIXP_COLL_TYPE_FENCE_TREE:
-		return "COLL_FENCE_TREE";
-	case PMIXP_COLL_TYPE_FENCE_RING:
-		return "COLL_FENCE_RING";
-	case PMIXP_COLL_TYPE_FENCE_MAX:
-		return "COLL_FENCE_MAX";
-	default:
-		return "COLL_FENCE_UNK";
-	}
-}
-
 typedef enum {
 	PMIXP_COLL_CPERF_TREE = PMIXP_COLL_TYPE_FENCE_TREE,
 	PMIXP_COLL_CPERF_RING = PMIXP_COLL_TYPE_FENCE_RING,
 	PMIXP_COLL_CPERF_MIXED = PMIXP_COLL_TYPE_FENCE_MAX,
 	PMIXP_COLL_CPERF_BARRIER
 } pmixp_coll_cperf_mode_t;
-
-inline static char *
-pmixp_coll_cperf_mode2str(pmixp_coll_cperf_mode_t mode) {
-	switch(mode) {
-	case PMIXP_COLL_CPERF_RING:
-		return "PMIXP_COLL_CPERF_RING";
-	case PMIXP_COLL_CPERF_TREE:
-		return "PMIXP_COLL_CPERF_TREE";
-	case PMIXP_COLL_CPERF_MIXED:
-		return "PMIXP_COLL_CPERF_MIXED";
-	case PMIXP_COLL_CPERF_BARRIER:
-		return "PMIXP_COLL_CPERF_BARRIER";
-	default:
-		return "PMIXP_COLL_CPERF_UNK";
-	}
-}
 
 int pmixp_hostset_from_ranges(const pmixp_proc_t *procs, size_t nprocs,
 			      hostlist_t *hl_out);
@@ -104,50 +74,12 @@ typedef enum {
 	PMIXP_COLL_TREE_DOWNFWD,
 } pmixp_coll_tree_state_t;
 
-inline static char *
-pmixp_coll_tree_state2str(pmixp_coll_tree_state_t state)
-{
-	switch (state) {
-	case PMIXP_COLL_TREE_SYNC:
-		return "COLL_SYNC";
-	case PMIXP_COLL_TREE_COLLECT:
-		return "COLL_COLLECT";
-	case PMIXP_COLL_TREE_UPFWD:
-		return "COLL_UPFWD";
-	case PMIXP_COLL_TREE_UPFWD_WSC:
-		return "COLL_UPFWD_WAITSND";
-	case PMIXP_COLL_TREE_UPFWD_WPC:
-		return "COLL_UPFWD_WAITPRNT";
-	case PMIXP_COLL_TREE_DOWNFWD:
-		return "COLL_DOWNFWD";
-	default:
-		return "COLL_UNKNOWN";
-	}
-}
-
 typedef enum {
 	PMIXP_COLL_TREE_SND_NONE,
 	PMIXP_COLL_TREE_SND_ACTIVE,
 	PMIXP_COLL_TREE_SND_DONE,
 	PMIXP_COLL_TREE_SND_FAILED,
 } pmixp_coll_tree_sndstate_t;
-
-inline static char *
-pmixp_coll_tree_sndstatus2str(pmixp_coll_tree_sndstate_t state)
-{
-	switch (state) {
-	case PMIXP_COLL_TREE_SND_NONE:
-		return "COLL_SND_NONE";
-	case PMIXP_COLL_TREE_SND_ACTIVE:
-		return "COLL_SND_ACTIVE";
-	case PMIXP_COLL_TREE_SND_DONE:
-		return "COLL_SND_DONE";
-	case PMIXP_COLL_TREE_SND_FAILED:
-		return "COLL_SND_FAILED";
-	default:
-		return "COLL_UNKNOWN";
-	}
-}
 
 typedef enum {
 	PMIXP_COLL_REQ_PROGRESS,
@@ -235,21 +167,6 @@ typedef struct {
 	uint32_t hop_seq;
 } pmixp_coll_msg_ring_data_t;
 
-inline static char *
-pmixp_coll_ring_state2str(pmixp_ring_state_t state)
-{
-	switch (state) {
-	case PMIXP_COLL_RING_SYNC:
-		return "COLL_RING_SYNC";
-	case PMIXP_COLL_RING_PROGRESS:
-		return "PMIXP_COLL_RING_PROGRESS";
-	case PMIXP_COLL_RING_FINALIZE:
-		return "PMIXP_COLL_RING_FINILIZE";
-	default:
-		return "COLL_RING_UNKNOWN";
-	}
-}
-
 /* General coll struct */
 typedef struct pmixp_coll_s {
 #ifndef NDEBUG
@@ -332,11 +249,7 @@ void pmixp_coll_ring_free(pmixp_coll_ring_t *ring);
 
 
 /* common coll func */
-static inline void pmixp_coll_sanity_check(pmixp_coll_t *coll)
-{
-	xassert(NULL != coll);
-	xassert(coll->magic == PMIXP_COLL_STATE_MAGIC);
-}
+void pmixp_coll_sanity_check(pmixp_coll_t *coll);
 int pmixp_coll_init(pmixp_coll_t *coll, pmixp_coll_type_t type,
 		    const pmixp_proc_t *procs, size_t nprocs);
 int pmixp_coll_contrib_local(pmixp_coll_t *coll, pmixp_coll_type_t type,
@@ -348,5 +261,10 @@ int pmixp_coll_belong_chk(const pmixp_proc_t *procs, size_t nprocs);
 void pmixp_coll_log(pmixp_coll_t *coll);
 void pmixp_coll_ring_log(pmixp_coll_t *coll);
 void pmixp_coll_tree_log(pmixp_coll_t *coll);
+char *pmixp_coll_type2str(pmixp_coll_type_t type);
+char *pmixp_coll_cperf_mode2str(pmixp_coll_cperf_mode_t mode);
+char *pmixp_coll_tree_state2str(pmixp_coll_tree_state_t state);
+char *pmixp_coll_tree_sndstatus2str(pmixp_coll_tree_sndstate_t state);
+char *pmixp_coll_ring_state2str(pmixp_ring_state_t state);
 
 #endif /* PMIXP_COLL_RING_H */
