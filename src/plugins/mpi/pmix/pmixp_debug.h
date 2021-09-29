@@ -78,12 +78,6 @@
 #ifdef NDEBUG
 #define pmixp_debug_hang(x)
 #else
-static inline void _pmixp_debug_hang(int delay)
-{
-	while (delay) {
-		sleep(1);
-	}
-}
 
 #define pmixp_debug_hang(x) _pmixp_debug_hang(x)
 
