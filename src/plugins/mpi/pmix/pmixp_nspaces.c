@@ -176,3 +176,9 @@ int pmixp_nspace_resolve(const char *name, int rank)
 
 	return nsptr->task_map[rank];
 }
+
+hostlist_t pmixp_nspace_hostlist(pmixp_namespace_t *nsptr)
+{
+	hostlist_t hl = hostlist_copy(nsptr->hl);
+	return hl;
+}
