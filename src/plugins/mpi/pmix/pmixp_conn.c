@@ -271,3 +271,41 @@ static inline void _tmp_engines_return_direct(pmixp_io_engine_t *eng)
 	xassert(NULL != eng);
 	list_push(_direct_engines, eng);
 }
+
+bool pmixp_conn_is_alive(pmixp_conn_t *conn)
+{
+	return pmixp_io_operating(conn->eng);
+}
+
+bool pmixp_conn_progress_rcv(pmixp_conn_t *conn)
+{
+	bool ret = false;
+	if (NULL == conn->hdr) {
+		/* allocate at the first use */
+		conn->hdr = pmixp_io_recv_hdr_alloc_host(conn->eng);
+	}
+	/* slurm */
+	pmixp_io_rcvd_progress(conn->eng);
+	if (pmixp_io_rcvd_ready(conn->eng)) {
+		void *msg = pmixp_io_rcvd_extract(conn->eng, conn->hdr);
+		conn->rcv_progress_cb(conn, conn->hdr, msg);
+		ret = true;
+	}
+
+	return ret;
+}
+
+void pmixp_conn_progress_snd(pmixp_conn_t *conn)
+{
+	pmixp_io_send_progress(conn->eng);
+}
+
+pmixp_io_engine_t *pmixp_conn_get_eng(pmixp_conn_t *conn)
+{
+	return conn->eng;
+}
+
+void *pmixp_conn_get_data(pmixp_conn_t *conn)
+{
+	return conn->ret_data;
+}
