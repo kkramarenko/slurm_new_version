@@ -60,6 +60,371 @@
 /* must come after the above pmixp includes */
 #include "src/common/forward.h"
 
+pmixp_list_elem_t *pmixp_list_elem_new(void)
+{
+	return xmalloc(sizeof(pmixp_list_elem_t));
+}
+
+void pmixp_list_elem_free(pmixp_list_elem_t *elem)
+{
+	xfree(elem);
+}
+
+bool pmixp_list_empty(pmixp_list_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+#endif
+	return !(l->count);
+}
+
+size_t pmixp_list_count(pmixp_list_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+#endif
+	return l->count;
+}
+
+void pmixp_list_init_pre(pmixp_list_t *l,
+				       pmixp_list_elem_t *h,
+				       pmixp_list_elem_t *t)
+{
+	xassert(l && h && t);
+	l->head = h;
+	l->tail = t;
+
+	l->head->data = NULL;
+	l->head->next = l->tail;
+	l->head->prev = NULL;
+
+	l->tail->data = NULL;
+	l->tail->prev = l->head;
+	l->tail->next = NULL;
+
+	l->count = 0;
+}
+
+void pmixp_list_fini_pre(pmixp_list_t *l,
+				       pmixp_list_elem_t **h,
+				       pmixp_list_elem_t **t)
+{
+	/* list supposed to be empty */
+	xassert(l->head && l->tail);
+	xassert(l->head->next == l->tail);
+	xassert(l->head == l->tail->prev);
+	xassert(!l->count);
+
+	*h = l->head;
+	*t = l->tail;
+
+	l->head = NULL;
+	l->tail = NULL;
+	l->count = 0;
+}
+
+void pmixp_list_init(pmixp_list_t *l)
+{
+	pmixp_list_init_pre(l, pmixp_list_elem_new(), pmixp_list_elem_new());
+}
+
+void pmixp_list_fini(pmixp_list_t *l)
+{
+	pmixp_list_elem_t *elem1, *elem2;
+	pmixp_list_fini_pre(l, &elem1, &elem2);
+	pmixp_list_elem_free(elem1);
+	pmixp_list_elem_free(elem2);
+}
+
+void pmixp_list_enq(pmixp_list_t *l, pmixp_list_elem_t *elem)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(elem);
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+#ifndef NDEBUG
+	elem->lptr = l;
+#endif /* NDEBUG */
+#endif /* PMIXP_LIST_DEBUG */
+
+	/* setup connection to the previous elem */
+	elem->prev = l->tail->prev;
+	elem->prev->next = elem;
+
+	/* setup connection to the dummy tail elem */
+	elem->next = l->tail;
+	l->tail->prev = elem;
+
+	/* reduce element count */
+	l->count++;
+}
+
+pmixp_list_elem_t *pmixp_list_deq(pmixp_list_t *l)
+{
+	pmixp_list_elem_t *ret;
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+	xassert (!pmixp_list_empty(l));
+#endif
+	/* user is responsible to ensure that
+	 * list is not empty */
+	ret = l->head->next;
+
+#if PMIXP_LIST_DEBUG
+	xassert(ret->lptr == l);
+#endif
+
+	/* reconnect the list, removing element */
+	l->head->next = ret->next;
+	ret->next->prev = l->head;
+
+	/* reduce element count */
+	l->count--;
+
+	return ret;
+}
+
+void pmixp_list_push(pmixp_list_t *l, pmixp_list_elem_t *elem)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+#ifndef NDEBUG
+	elem->lptr = l;
+#endif
+#endif /* PMIXP_LIST_DEBUG */
+
+	/* setup connection with ex-first element */
+	elem->next = l->head->next;
+	elem->next->prev = elem;
+
+	/* setup connection with dummy head element */
+	l->head->next = elem;
+	elem->prev = l->head;
+
+	/* reduce element count */
+	l->count++;
+}
+
+pmixp_list_elem_t *pmixp_list_pop(pmixp_list_t *l)
+{
+	pmixp_list_elem_t *ret = NULL;
+
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+	xassert (!pmixp_list_empty(l));
+#endif
+
+	/* user is responsible to ensure that
+	 * list is not empty */
+	ret = l->tail->prev;
+
+#if PMIXP_LIST_DEBUG
+	xassert(ret->lptr == l);
+#endif
+
+	l->tail->prev = ret->prev;
+	ret->prev->next = l->tail;
+	l->count--;
+
+	return ret;
+}
+
+pmixp_list_elem_t *pmixp_list_rem(
+	pmixp_list_t *l, pmixp_list_elem_t *elem)
+{
+	pmixp_list_elem_t *next;
+
+#if PMIXP_LIST_DEBUG
+	xassert(elem && l);
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+	xassert(elem->next && elem->prev);
+	xassert((elem != l->head) && (elem != l->tail));
+	xassert(elem->lptr == l);
+#endif
+
+	next = elem->next;
+	elem->prev->next = elem->next;
+	elem->next->prev = elem->prev;
+	/* protect the list */
+	elem->next = elem->prev = NULL;
+
+	l->count--;
+	return next;
+}
+
+pmixp_list_elem_t *pmixp_list_begin(pmixp_list_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+#endif
+	return l->head->next;
+}
+
+pmixp_list_elem_t *pmixp_list_end(pmixp_list_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+#endif
+	return l->tail;
+}
+
+pmixp_list_elem_t *pmixp_list_next(
+	pmixp_list_t *l, pmixp_list_elem_t *cur)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l->head && l->tail);
+	xassert(!l->head->data && !l->tail->data);
+	xassert(!l->tail->next && !l->head->prev);
+	xassert(cur);
+	xassert(cur->lptr == l);
+#endif
+	return cur->next;
+}
+
+pmixp_list_elem_t *__pmixp_rlist_get_free(
+	pmixp_list_t *l, size_t pre_alloc)
+{
+	if (pmixp_list_empty(l)) {
+		/* add l->pre_alloc elements to the source list */
+		int i;
+		for (i=0; i<pre_alloc-1; i++) {
+			pmixp_list_enq(l, pmixp_list_elem_new());
+		}
+	}
+	return pmixp_list_deq(l);
+}
+
+void pmixp_rlist_init(
+	pmixp_rlist_t *l, pmixp_list_t *elem_src, size_t pre_alloc)
+{
+	pmixp_list_elem_t *h, *t;
+	xassert(l && elem_src && pre_alloc);
+	l->src_list = elem_src;
+	l->pre_alloc = pre_alloc;
+
+	/* initialize local list */
+	h = __pmixp_rlist_get_free(elem_src, pre_alloc);
+	t = __pmixp_rlist_get_free(elem_src, pre_alloc);
+	xassert(h && t);
+	pmixp_list_init_pre(&l->list,h, t);
+}
+
+void pmixp_rlist_fini(pmixp_rlist_t *l)
+{
+	pmixp_list_elem_t *h, *t;
+	xassert(l);
+	pmixp_list_fini_pre(&l->list, &h, &t);
+	xassert(h && t);
+	pmixp_list_enq(l->src_list, h);
+	pmixp_list_enq(l->src_list, t);
+}
+
+bool pmixp_rlist_empty(pmixp_rlist_t *l)
+{
+	return pmixp_list_empty(&l->list);
+}
+
+size_t pmixp_rlist_count(pmixp_rlist_t *l)
+{
+	return pmixp_list_count(&l->list);
+}
+
+void pmixp_rlist_enq(pmixp_rlist_t *l, void *ptr)
+{
+	pmixp_list_elem_t *elem = NULL;
+	elem = __pmixp_rlist_get_free(l->src_list, l->pre_alloc);
+	PMIXP_LIST_VAL(elem) = ptr;
+	pmixp_list_enq(&l->list, elem);
+}
+
+void *pmixp_rlist_deq(pmixp_rlist_t *l)
+{
+	pmixp_list_elem_t *elem = NULL;
+	void *val = NULL;
+
+	/* user is responsible to ensure that
+	 * list is not empty
+	 */
+	elem = pmixp_list_deq(&l->list);
+	val = PMIXP_LIST_VAL(elem);
+	pmixp_list_enq(l->src_list, elem);
+	return val;
+}
+
+void pmixp_rlist_push(pmixp_rlist_t *l, void *ptr)
+{
+	pmixp_list_elem_t *elem = NULL;
+	elem = __pmixp_rlist_get_free(l->src_list, l->pre_alloc);
+	PMIXP_LIST_VAL(elem) = ptr;
+	pmixp_list_push(&l->list, elem);
+}
+
+void *pmixp_rlist_pop(pmixp_rlist_t *l)
+{
+	pmixp_list_elem_t *elem = NULL;
+	void *val = NULL;
+#if PMIXP_LIST_DEBUG
+	xassert(l);
+#endif
+	/* user is responsible to ensure that
+	 * list is not empty
+	 */
+	elem = pmixp_list_pop(&l->list);
+	val = PMIXP_LIST_VAL(elem);
+	pmixp_list_enq(l->src_list, elem);
+	return val;
+}
+
+pmixp_list_elem_t *pmixp_rlist_begin(pmixp_rlist_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l);
+#endif
+	return pmixp_list_begin(&l->list);
+}
+
+pmixp_list_elem_t *pmixp_rlist_end(pmixp_rlist_t *l)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l);
+#endif
+	return pmixp_list_end(&l->list);
+}
+
+pmixp_list_elem_t *pmixp_rlist_next(
+	pmixp_rlist_t *l, pmixp_list_elem_t *cur)
+{
+#if PMIXP_LIST_DEBUG
+	xassert(l && cur);
+#endif
+	return pmixp_list_next(&l->list, cur);
+}
+
+pmixp_list_elem_t *pmixp_rlist_rem(
+	pmixp_rlist_t *l, pmixp_list_elem_t *elem)
+{
+	pmixp_list_elem_t *ret = NULL;
+#if PMIXP_LIST_DEBUG
+	xassert(l && elem);
+#endif
+	ret = pmixp_list_rem(&l->list, elem);
+	pmixp_list_enq(l->src_list, elem);
+	return ret;
+}
+
 extern int pmixp_count_digits_base10(uint32_t val)
 {
 	int digit_count = 0;
