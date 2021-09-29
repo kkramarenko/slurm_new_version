@@ -541,3 +541,210 @@ static int _env_set(char ***env)
 
 	return SLURM_SUCCESS;
 }
+
+int pmixp_info_timeout(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.timeout;
+}
+
+char *pmixp_info_hostname(void)
+{
+	return _pmixp_job_info.hostname;
+}
+
+char *pmixp_info_tmpdir_cli(void)
+{
+	return _pmixp_job_info.cli_tmpdir;
+}
+
+char *pmixp_info_tmpdir_cli_base(void)
+{
+	return _pmixp_job_info.cli_tmpdir_base;
+}
+
+char *pmixp_info_tmpdir_lib(void)
+{
+	return _pmixp_job_info.lib_tmpdir;
+}
+
+uint32_t pmixp_info_jobuid(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.uid;
+}
+
+uint32_t pmixp_info_jobgid(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.gid;
+}
+
+uint32_t pmixp_info_jobid(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.step_id.job_id;
+}
+
+char *pmixp_info_srun_ip(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.srun_ip;
+}
+
+int pmixp_info_abort_agent_port(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.abort_agent_port;
+}
+
+uint32_t pmixp_info_stepid(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.step_id.step_id;
+}
+
+char *pmixp_info_namespace(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.nspace;
+}
+
+uint32_t pmixp_info_nodeid(void)
+{
+	/* This routine is called from PMIX_DEBUG/ERROR and
+	 * this CAN happen before initialization. Relax demand to have
+	 * _pmix_job_info.magic == PMIX_INFO_MAGIC
+	 * ! xassert(_pmix_job_info.magic == PMIX_INFO_MAGIC);
+	 */
+	return _pmixp_job_info.node_id;
+}
+
+uint32_t pmixp_info_nodeid_job(void)
+{
+	/* This routine is called from PMIX_DEBUG/ERROR and
+	 * this CAN happen before initialization. Relax demand to have
+	 * _pmix_job_info.magic == PMIX_INFO_MAGIC
+	 * ! xassert(_pmix_job_info.magic == PMIX_INFO_MAGIC);
+	 */
+	return _pmixp_job_info.node_id_job;
+}
+
+uint32_t pmixp_info_nodes(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.nnodes;
+}
+
+uint32_t pmixp_info_nodes_uni(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.nnodes_job;
+}
+
+uint32_t pmixp_info_tasks(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.ntasks;
+}
+
+uint32_t pmixp_info_tasks_node(uint32_t nodeid)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	xassert(nodeid < _pmixp_job_info.nnodes);
+	return _pmixp_job_info.task_cnts[nodeid];
+}
+
+uint32_t *pmixp_info_tasks_cnts(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.task_cnts;
+}
+
+uint32_t pmixp_info_tasks_loc(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.node_tasks;
+}
+
+uint32_t pmixp_info_tasks_uni(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.ntasks_job;
+}
+
+uint32_t pmixp_info_cpus(void)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	return _pmixp_job_info.ncpus_job;
+}
+
+uint32_t pmixp_info_taskid(uint32_t localid)
+{
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	xassert(localid < _pmixp_job_info.node_tasks);
+	return _pmixp_job_info.gtids[localid];
+}
+
+int pmixp_info_taskid2localid(uint32_t taskid)
+{
+	int i;
+	xassert(_pmixp_job_info.magic == PMIXP_INFO_MAGIC);
+	xassert(taskid < _pmixp_job_info.ntasks);
+
+	for (i = 0; i < _pmixp_job_info.node_tasks; i++) {
+		if (_pmixp_job_info.gtids[i] == taskid)
+			return i;
+	}
+	return -1;
+}
+
+char *pmixp_info_task_map(void)
+{
+	return _pmixp_job_info.task_map_packed;
+}
+
+hostlist_t pmixp_info_step_hostlist(void)
+{
+	return _pmixp_job_info.step_hl;
+}
+
+char *pmixp_info_step_host(int nodeid)
+{
+	xassert(nodeid < _pmixp_job_info.nnodes);
+	char *p = hostlist_nth(_pmixp_job_info.step_hl, nodeid);
+	char *ret = xstrdup(p);
+	free(p);
+	return ret;
+}
+
+int pmixp_info_step_hostid(char *hostname)
+{
+	return hostlist_find(_pmixp_job_info.step_hl, hostname);
+}
+
+char *pmixp_info_job_host(int nodeid)
+{
+	xassert(nodeid < _pmixp_job_info.nnodes_job);
+	if( nodeid >= _pmixp_job_info.nnodes_job ){
+		return NULL;
+	}
+	char *p = hostlist_nth(_pmixp_job_info.job_hl, nodeid);
+	char *ret = xstrdup(p);
+	free(p);
+	return ret;
+}
+
+int pmixp_info_job_hostid(char *hostname)
+{
+	return hostlist_find(_pmixp_job_info.job_hl, hostname);
+}
+
+char *pmixp_info_nspace_usock(const char *nspace)
+{
+	char *spool;
+	debug("setup sockets");
+	spool = xstrdup_printf("%s/stepd.%s",
+			       _pmixp_job_info.spool_dir, nspace);
+	return spool;
+}
