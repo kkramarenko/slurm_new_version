@@ -611,3 +611,67 @@ void pmixp_io_send_progress(pmixp_io_engine_t *eng)
 	slurm_mutex_unlock(&eng->send_lock);
 	pmixp_io_send_cleanup(eng, PMIXP_P2P_REGULAR);
 }
+
+int pmixp_io_fd(pmixp_io_engine_t *eng)
+{
+	return eng->sd;
+}
+
+bool pmixp_io_rcvd_ready(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return (eng->rcvd_hdr_offs == eng->h.rhdr_net_size)
+			&& (eng->rcvd_pay_size == eng->rcvd_pay_offs);
+}
+
+bool pmixp_io_operating(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return (PMIXP_IO_OPERATING == eng->io_state);
+}
+
+bool pmixp_io_conn_closed(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return (PMIXP_IO_CONN_CLOSED == eng->io_state);
+}
+
+bool pmixp_io_enqueue_ok(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return (PMIXP_IO_OPERATING == eng->io_state) ||
+			(PMIXP_IO_INIT == eng->io_state);
+}
+
+bool pmixp_io_finalized(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return (PMIXP_IO_FINALIZED == eng->io_state);
+}
+
+int pmixp_io_error(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return eng->error;
+}
+
+void pmixp_io_attach(pmixp_io_engine_t *eng, int fd)
+{
+	/* Initialize general options */
+	xassert(PMIXP_MSGSTATE_MAGIC == eng->magic);
+	xassert(PMIXP_IO_INIT == eng->io_state);
+	eng->sd = fd;
+	eng->io_state = PMIXP_IO_OPERATING;
+}
+
+void *pmixp_io_recv_hdr_alloc_host(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return xmalloc(eng->h.rhdr_host_size);
+}
+
+void *pmixp_io_recv_hdr_alloc_net(pmixp_io_engine_t *eng)
+{
+	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
+	return xmalloc(eng->h.rhdr_net_size);
+}

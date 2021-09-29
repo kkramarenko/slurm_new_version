@@ -77,49 +77,13 @@ typedef struct {
 	List send_queue, complete_queue;
 } pmixp_io_engine_t;
 
-static inline int pmixp_io_fd(pmixp_io_engine_t *eng)
-{
-	return eng->sd;
-}
-
-
-static inline bool pmixp_io_rcvd_ready(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return (eng->rcvd_hdr_offs == eng->h.rhdr_net_size)
-			&& (eng->rcvd_pay_size == eng->rcvd_pay_offs);
-}
-
-static inline bool pmixp_io_operating(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return (PMIXP_IO_OPERATING == eng->io_state);
-}
-
-static inline bool pmixp_io_conn_closed(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return (PMIXP_IO_CONN_CLOSED == eng->io_state);
-}
-
-static inline bool pmixp_io_enqueue_ok(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return (PMIXP_IO_OPERATING == eng->io_state) ||
-			(PMIXP_IO_INIT == eng->io_state);
-}
-
-static inline bool pmixp_io_finalized(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return (PMIXP_IO_FINALIZED == eng->io_state);
-}
-
-static inline int pmixp_io_error(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return eng->error;
-}
+int pmixp_io_fd(pmixp_io_engine_t *eng);
+bool pmixp_io_rcvd_ready(pmixp_io_engine_t *eng);
+bool pmixp_io_operating(pmixp_io_engine_t *eng);
+bool pmixp_io_conn_closed(pmixp_io_engine_t *eng);
+bool pmixp_io_enqueue_ok(pmixp_io_engine_t *eng);
+bool pmixp_io_finalized(pmixp_io_engine_t *eng);
+int pmixp_io_error(pmixp_io_engine_t *eng);
 
 /* initialize all the data structures to prepare
  * engine for operation.
@@ -130,15 +94,7 @@ void pmixp_io_init(pmixp_io_engine_t *eng,
 		   pmixp_p2p_data_t header);
 
 /* attach engine to the specific file descriptor */
-static inline void
-pmixp_io_attach(pmixp_io_engine_t *eng, int fd)
-{
-	/* Initialize general options */
-	xassert(PMIXP_MSGSTATE_MAGIC == eng->magic);
-	xassert(PMIXP_IO_INIT == eng->io_state);
-	eng->sd = fd;
-	eng->io_state = PMIXP_IO_OPERATING;
-}
+void pmixp_io_attach(pmixp_io_engine_t *eng, int fd);
 
 /* detach engine from the current file descriptor.
  * the `fd` is returned and can be used with other
@@ -156,19 +112,8 @@ void pmixp_io_finalize(pmixp_io_engine_t *eng, int error);
 /* Receiver */
 void pmixp_io_rcvd_progress(pmixp_io_engine_t *eng);
 void *pmixp_io_rcvd_extract(pmixp_io_engine_t *eng, void *header);
-static inline void*
-pmixp_io_recv_hdr_alloc_host(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return xmalloc(eng->h.rhdr_host_size);
-}
-
-static inline void*
-pmixp_io_recv_hdr_alloc_net(pmixp_io_engine_t *eng)
-{
-	xassert(eng->magic == PMIXP_MSGSTATE_MAGIC);
-	return xmalloc(eng->h.rhdr_net_size);
-}
+void *pmixp_io_recv_hdr_alloc_host(pmixp_io_engine_t *eng);
+void *pmixp_io_recv_hdr_alloc_net(pmixp_io_engine_t *eng)
 
 /* Transmitter */
 /* thread-safe function, only calls Slurm list append */

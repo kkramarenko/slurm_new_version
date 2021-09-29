@@ -139,3 +139,187 @@ char *pmixp_dconn_ep_data()
 {
 	return ep_data;
 }
+
+pmixp_dconn_t *pmixp_dconn_lock(int nodeid)
+{
+	xassert(nodeid < _pmixp_dconn_conn_cnt);
+	slurm_mutex_lock(&_pmixp_dconn_conns[nodeid].lock);
+	return &_pmixp_dconn_conns[nodeid];
+}
+
+void pmixp_dconn_unlock(pmixp_dconn_t *dconn)
+{
+	pmixp_dconn_verify(dconn);
+	slurm_mutex_unlock(&dconn->lock);
+}
+
+pmixp_dconn_state_t pmixp_dconn_state(pmixp_dconn_t *dconn)
+{
+	pmixp_dconn_verify(dconn);
+	return dconn->state;
+}
+
+void pmixp_dconn_req_sent(pmixp_dconn_t *dconn)
+{
+	if (PMIXP_DIRECT_INIT != dconn->state) {
+		PMIXP_ERROR("State machine violation, when transition "
+			    "to PORT_SENT from %d",
+			    (int)dconn->state);
+		xassert(PMIXP_DIRECT_INIT == dconn->state);
+		abort();
+	}
+	dconn->state = PMIXP_DIRECT_EP_SENT;
+}
+
+int pmixp_dconn_send(pmixp_dconn_t *dconn, void *msg)
+{
+	return _pmixp_dconn_h.send(dconn->priv, msg);
+}
+
+void pmixp_dconn_regio(eio_handle_t *h)
+{
+	return _pmixp_dconn_h.regio(h);
+}
+
+bool pmixp_dconn_require_connect(pmixp_dconn_t *dconn, bool *send_init)
+{
+	*send_init = false;
+	switch( pmixp_dconn_state(dconn) ){
+	case PMIXP_DIRECT_INIT:
+		*send_init = true;
+		return true;
+	case PMIXP_DIRECT_EP_SENT:{
+		switch (pmixp_dconn_connect_type()) {
+		case PMIXP_DCONN_CONN_TYPE_TWOSIDE: {
+			if( dconn->nodeid < pmixp_info_nodeid()){
+				*send_init = true;
+				return true;
+			} else {
+				/* just ignore this connection,
+				 * remote side will come with counter-
+				 * connection
+				 */
+				return false;
+			}
+		}
+		case PMIXP_DCONN_CONN_TYPE_ONESIDE:
+			*send_init = false;
+			return true;
+		default:
+			/* shouldn't happen */
+			PMIXP_ERROR("Unexpected direct connection "
+				    "semantics type: %d",
+				    pmixp_dconn_connect_type());
+			xassert(0 && pmixp_dconn_connect_type());
+			abort();
+		}
+		break;
+	}
+	case PMIXP_DIRECT_CONNECTED:
+		PMIXP_DEBUG("Trying to re-establish the connection");
+		return false;
+	default:
+		/* shouldn't happen */
+		PMIXP_ERROR("Unexpected direct connection state: "
+			    "PMIXP_DIRECT_NONE");
+		xassert(0 && pmixp_dconn_state(dconn));
+		abort();
+	}
+	return false;
+}
+
+int pmixp_dconn_connect(pmixp_dconn_t *dconn, void *ep_data, int ep_len,
+        void *init_msg)
+{
+	int rc;
+	/* establish the connection */
+	rc = pmixp_dconn_connect_do(dconn, ep_data, ep_len, init_msg);
+	if (SLURM_SUCCESS == rc){
+		dconn->state = PMIXP_DIRECT_CONNECTED;
+	} else {
+		/*
+		 * Abort the application - we can't do what user requested.
+		 * Make sure to provide enough info
+		 */
+		char *nodename = pmixp_info_job_host(dconn->nodeid);
+		xassert(nodename);
+		if (NULL == nodename) {
+			PMIXP_ERROR("Bad nodeid = %d in the incoming message",
+				    dconn->nodeid);
+			abort();
+		}
+		PMIXP_ERROR("Cannot establish direct connection to %s (%d)",
+			    nodename, dconn->nodeid);
+		xfree(nodename);
+		pmixp_debug_hang(0); /* enable hang to debug this! */
+		slurm_kill_job_step(pmixp_info_jobid(),
+				    pmixp_info_stepid(), SIGKILL);
+	}
+	return rc;
+}
+
+pmixp_io_engine_t *pmixp_dconn_engine(pmixp_dconn_t *dconn)
+{
+	pmixp_dconn_verify(dconn);
+	xassert( PMIXP_DCONN_PROGRESS_SW == pmixp_dconn_progress_type(dconn));
+	if( PMIXP_DCONN_PROGRESS_SW == pmixp_dconn_progress_type(dconn) ){
+		return _pmixp_dconn_h.getio(dconn->priv);
+	}
+	return NULL;
+}
+
+pmixp_dconn_t *pmixp_dconn_accept(int nodeid, int fd)
+{
+	if( PMIXP_DCONN_PROGRESS_SW != pmixp_dconn_progress_type() ){
+		PMIXP_ERROR("Accept is not supported by direct connection "
+			    "of type %d",
+			    (int)pmixp_dconn_progress_type());
+		xassert(PMIXP_DCONN_PROGRESS_SW ==
+			pmixp_dconn_progress_type());
+		return NULL;
+	}
+	pmixp_dconn_t *dconn = pmixp_dconn_lock(nodeid);
+	xassert(dconn);
+	pmixp_io_engine_t *eng = _pmixp_dconn_h.getio(dconn->priv);
+	xassert( NULL != eng );
+
+	if( PMIXP_DIRECT_EP_SENT == pmixp_dconn_state(dconn) ){
+		/* we request this connection some time ago
+		 * and now we finishing it's establishment
+		 */
+		pmixp_fd_set_nodelay(fd);
+		pmixp_io_attach(eng, fd);
+		dconn->state = PMIXP_DIRECT_CONNECTED;
+	} else {
+		/* shouldn't happen */
+		PMIXP_ERROR("Unexpected direct connection state: %d",
+			    (int)pmixp_dconn_state(dconn));
+		xassert(PMIXP_DIRECT_EP_SENT == pmixp_dconn_state(dconn));
+		pmixp_dconn_unlock(dconn);
+		return NULL;
+	}
+	return dconn;
+}
+
+void pmixp_dconn_disconnect(pmixp_dconn_t *dconn)
+{
+	switch( pmixp_dconn_state(dconn) ){
+	case PMIXP_DIRECT_INIT:
+	case PMIXP_DIRECT_EP_SENT:
+		break;
+	case PMIXP_DIRECT_CONNECTED:{
+		pmixp_io_engine_t *eng = _pmixp_dconn_h.getio(dconn->priv);
+		int fd = pmixp_io_detach(eng);
+		close(fd);
+		break;
+	}
+	default:
+		/* shouldn't happen */
+		PMIXP_ERROR("Unexpected direct connection state: "
+			    "PMIXP_DIRECT_NONE");
+		xassert(0 && pmixp_dconn_state(dconn));
+		abort();
+	}
+
+	dconn->state = PMIXP_DIRECT_INIT;
+}

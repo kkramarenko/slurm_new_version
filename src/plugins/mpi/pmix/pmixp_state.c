@@ -71,6 +71,11 @@ void pmixp_state_finalize(void)
 	list_destroy(_pmixp_state.coll);
 }
 
+void pmixp_state_sanity_check(void)
+{
+	xassert(_pmixp_state.magic == PMIXP_STATE_MAGIC);
+}
+
 static bool _compare_ranges(const pmixp_proc_t *r1, const pmixp_proc_t *r2,
 			    size_t nprocs)
 {

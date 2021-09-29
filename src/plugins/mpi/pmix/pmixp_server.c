@@ -944,6 +944,14 @@ exit:
 	FREE_NULL_BUFFER(buf);
 }
 
+void pmixp_server_buf_reserve(buf_t *buf, uint32_t size)
+{
+	if (remaining_buf(buf) < size) {
+		uint32_t to_reserve = size - remaining_buf(buf);
+		grow_buf(buf, to_reserve);
+	}
+}
+
 void pmixp_server_sent_buf_cb(int rc, pmixp_p2p_ctx_t ctx, void *data)
 {
 	buf_t *buf = (buf_t *) data;

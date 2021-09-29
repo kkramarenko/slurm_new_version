@@ -67,11 +67,7 @@ extern pmixp_state_t _pmixp_state;
 
 int pmixp_state_init(void);
 void pmixp_state_finalize(void);
-
-static inline void pmixp_state_sanity_check(void)
-{
-	xassert(_pmixp_state.magic == PMIXP_STATE_MAGIC);
-}
+void pmixp_state_sanity_check(void);
 
 /*
  * Collective state
